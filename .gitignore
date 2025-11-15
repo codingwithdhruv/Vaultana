@@ -1,0 +1,23 @@
+# Rust / Cargo
+/target/
+**/target/
+
+# Anchor / Solana
+/target/
+/target/**      # redundant but OK
+/target/*.so
+/target/deploy/
+target/idl/
+
+# Node / JS
+node_modules/
+yarn.lock
+npm-debug.log
+
+# Anchor local state
+/.anchor/
+
+# IDE / misc
+.vscode/
+.idea/
+.DS_Store
