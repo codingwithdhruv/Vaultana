@@ -60,6 +60,22 @@ it("accepts deposits >= 1sol", async () => {
   assert.ok(tx);
 })
 
+it("rejects withdrawal > 2sol", async () => {
+  try {
+    await program.methods
+    .withdrawal(new anchor.BN(2.1 * anchor.web3.LAMPORTS_PER_SOL))
+    .accounts({
+      user: provider.publicKey,
+      state: vaultState,
+      vault,
+      systemProgram: anchor.web3.SystemProgram.programId
+    })
+    .rpc();
+    assert.fail("Should have failed because withdrawal > 2sol")
+  } catch (error) {
+    
+  }
+})
 
 });
 
