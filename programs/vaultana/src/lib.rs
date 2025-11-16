@@ -10,6 +10,16 @@ pub mod vaultana {
         ctx.accounts.initialize(amount, &ctx.bumps)?;
         Ok(())
     }
+
+    pub fn deposit(ctx: Context<Operations>, amount: u64) -> Result<()> {
+        ctx.accounts.deposit(amount)?;
+        Ok(())
+    }
+
+    pub fn withdrawal(ctx: Context<Operations>, amount: u64) -> Result<()> {
+        ctx.accounts.withdrawal(amount)?;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
