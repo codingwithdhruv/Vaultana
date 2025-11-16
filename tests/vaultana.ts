@@ -47,6 +47,20 @@ it("rejects deposits < 1sol", async () => {
   }
 });
 
+it("accepts deposits >= 1sol", async () => {
+  const tx = await program.methods
+  .deposit(new anchor.BN(1 * anchor.web3.LAMPORTS_PER_SOL))
+  .accounts({
+    user: provider.publicKey,
+    state: vaultState,
+    vault,
+    systemProgram: anchor.web3.SystemProgram.programId
+  })
+  .rpc();
+  assert.ok(tx);
+})
+
+
 });
 
 
