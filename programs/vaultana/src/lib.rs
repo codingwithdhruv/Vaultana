@@ -84,34 +84,34 @@ impl<'info> Operations<'info> {
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         transfer(cpi_ctx, amount)?;
 
-        self.check_balance()?;
+        // self.check_balance()?;
 
         Ok(())
     }
 
-pub fn check_balance(&mut self) -> Result<()> {
-    if self.vault.lamports() >= self.state.amount {
-        let cpi_program = self.system_program.to_account_info();
+// pub fn check_balance(&mut self) -> Result<()> {
+//     if self.vault.lamports() >= self.state.amount {
+//         let cpi_program = self.system_program.to_account_info();
 
-        let cpi_accounts = Transfer {
-            from: self.vault.to_account_info(),
-            to: self.user.to_account_info()
-        };
+//         let cpi_accounts = Transfer {
+//             from: self.vault.to_account_info(),
+//             to: self.user.to_account_info()
+//         };
 
-        let seeds = &[
-            b"vault".as_ref(),
-            self.state.to_account_info().key.as_ref(),
-            &[self.state.vault_bump],
-        ];   
+//         let seeds = &[
+//             b"vault".as_ref(),
+//             self.state.to_account_info().key.as_ref(),
+//             &[self.state.vault_bump],
+//         ];   
 
-        let signer_seeds = &[&seeds[..]];
+//         let signer_seeds = &[&seeds[..]];
 
-        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+//         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
 
-        transfer(cpi_ctx, self.vault.lamports())?;
-    };
-    Ok(())
-} 
+//         transfer(cpi_ctx, self.vault.lamports())?;
+//     };
+//     Ok(())
+// } 
 
     pub fn withdrawal(&mut self, amount: u64) -> Result<()> {
         let cpi_program = self.system_program.to_account_info();
