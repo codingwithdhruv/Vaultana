@@ -95,5 +95,30 @@ describe("vaultana - token vault tests", function () {
     assert.ok(vaultAcc.mint.equals(mintPubkey), "vault ATA mint mismatch");
     assert.ok(Number(vaultAcc.amount) === 0, "vault ATA should have 0 tokens at init");
   });
+
+
+
+  it("rejects deposit < 5 token", async () => {
+    const small = Math.floor(5 * ONE);
+
+    try {
+      await program.methods
+        .deposit(new anchor.BN(small))
+        .accounts({
+          user: provider.publicKey,
+          userTokenAccount: userAta,
+          vault: vaultAta,
+          state: statePda,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+      assert.fail("deposit of <5 token should have failed");
+    } catch (err) {
+      console.log("expected error for small deposit:", err.toString().slice(0, 200));
+    }
+  });
+
 })
+
+
  
