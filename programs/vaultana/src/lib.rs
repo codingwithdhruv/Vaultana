@@ -1,4 +1,6 @@
-use anchor_lang::{prelude::*, system_program::{Transfer, transfer}};
+use anchor_lang::{prelude::*};
+use anchor_spl::token::{self, Token, TokenAccount, Transfer as TokenTransfer, Mint};
+use anchor_spl::associated_token::AssociatedToken;
 
 declare_id!("8b1gGyfBb45nA8nsWDmsHLXMTtcb3yds4GGqhzojQXtv");
 
@@ -6,18 +8,18 @@ declare_id!("8b1gGyfBb45nA8nsWDmsHLXMTtcb3yds4GGqhzojQXtv");
 pub mod vaultana {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>, amount: u64) -> Result<()> {
-        ctx.accounts.initialize(amount, &ctx.bumps)?;
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.initialize(&ctx.bumps)?;
         Ok(())
     }
 
     pub fn deposit(ctx: Context<Operations>, amount: u64) -> Result<()> {
-        ctx.accounts.deposit(amount)?;
+        ctx.accounts.deposit_token(amount)?;
         Ok(())
     }
 
     pub fn withdrawal(ctx: Context<Operations>, amount: u64) -> Result<()> {
-        ctx.accounts.withdrawal(amount)?;
+        ctx.accounts.withdraw_token(amount)?;
         Ok(())
     }
 }
@@ -27,29 +29,36 @@ pub struct Initialize<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
+    pub mint: Account<'info, Mint>,
+
     #[account(
         init,
         payer = user,
-        seeds = [b"state".as_ref(), user.key().as_ref()],
+        seeds = [b"state".as_ref(), user.key().as_ref(), mint.key().as_ref()],
         bump,
         space = VaultState::INIT_SPACE
     )]
     pub state: Account<'info, VaultState>,
 
     #[account(
-        seeds = [b"vault".as_ref(), state.key().as_ref()],
-        bump,
+        init,
+        payer = user,
+        associated_token::mint = mint,
+        associated_token::authority = state,
     )]
-    pub vault: SystemAccount<'info>,
+    pub vault: Account<'info, TokenAccount>,
+
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 impl<'info> Initialize<'info> {
-    pub fn initialize(&mut self, amount: u64, bumps: &InitializeBumps) -> Result<()> {
-        let rent_exempt = Rent::get()?.minimum_balance(self.state.to_account_info().data_len());
-        self.state.amount = amount;
-        self.state.vault_bump = bumps.vault;
+    pub fn initialize(&mut self, bumps: &InitializeBumps) -> Result<()> {
+        self.state.mint = self.mint.key();
         self.state.state_bump = bumps.state;
+        self.state.amount = 0;
         Ok(())
     }
 }
@@ -58,79 +67,68 @@ impl<'info> Initialize<'info> {
 pub struct Operations<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
+
     #[account(
         mut,
-        seeds = [b"vault".as_ref(), state.key().as_ref()],
-        bump = state.vault_bump
+        constraint = user_token_account.mint == state.mint
     )]
-    pub vault: SystemAccount<'info>,
+    pub user_token_account: Account<'info, TokenAccount>,
+
     #[account(
-        seeds = [b"state".as_ref(), user.key().as_ref()],
+        mut,
+        constraint = vault.mint == state.mint
+    )]
+    pub vault: Account<'info, TokenAccount>,
+
+    #[account(
+        seeds = [b"state".as_ref(), user.key().as_ref(), state.mint.as_ref()],
         bump = state.state_bump,
     )]
     pub state: Account<'info, VaultState>,
-    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 impl<'info> Operations<'info> {
-    pub fn deposit(&mut self, amount: u64) -> Result<()> {
-        let cpi_program = self.system_program.to_account_info();
+    pub fn deposit_token(&mut self, amount: u64) -> Result<()> {
 
-        let cpi_accounts = Transfer {
-            from: self.user.to_account_info(),
+        let cpi_accounts = TokenTransfer {
+            from: self.user_token_account.to_account_info(),
             to: self.vault.to_account_info(),
+            authority: self.user.to_account_info()
         };
 
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        transfer(cpi_ctx, amount)?;
-
-        // self.check_balance()?;
+        let cpi_ctx = CpiContext::new(self.token_program.to_account_info(), cpi_accounts);
+        token::transfer(cpi_ctx, amount)?;
+        self.state.amount = self.state.amount.checked_add(amount).unwrap();
 
         Ok(())
     }
 
-// pub fn check_balance(&mut self) -> Result<()> {
-//     if self.vault.lamports() >= self.state.amount {
-//         let cpi_program = self.system_program.to_account_info();
-
-//         let cpi_accounts = Transfer {
-//             from: self.vault.to_account_info(),
-//             to: self.user.to_account_info()
-//         };
-
-//         let seeds = &[
-//             b"vault".as_ref(),
-//             self.state.to_account_info().key.as_ref(),
-//             &[self.state.vault_bump],
-//         ];   
-
-//         let signer_seeds = &[&seeds[..]];
-
-//         let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
-
-//         transfer(cpi_ctx, self.vault.lamports())?;
-//     };
-//     Ok(())
-// } 
-
-    pub fn withdrawal(&mut self, amount: u64) -> Result<()> {
-        let cpi_program = self.system_program.to_account_info();
-
-        let cpi_accounts = Transfer {
+    pub fn withdraw_token(&mut self, amount: u64) -> Result<()> {
+        
+        let cpi_accounts = TokenTransfer {
             from: self.vault.to_account_info(),
-            to: self.user.to_account_info(),
+            to: self.user_token_account.to_account_info(),
+            authority: self.state.to_account_info(),
         };
 
         let seeds = &[
-            b"vault".as_ref(),
-            self.state.to_account_info().key.as_ref(),
-            &[self.state.vault_bump],
+            b"state".as_ref(),
+            self.user.to_account_info().key.as_ref(),
+            self.state.mint.as_ref(),
+            &[self.state.state_bump],
         ];
 
         let signer_seeds = &[&seeds[..]];
 
-        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
-        transfer(cpi_ctx, amount)?;
+        let cpi_ctx = CpiContext::new_with_signer(
+            self.token_program.to_account_info(), 
+            cpi_accounts, 
+            signer_seeds
+        );
+        require!(self.state.amount >= amount, CustomError::InsufficientFunds);
+        token::transfer(cpi_ctx, amount)?;
+        self.state.amount = self.state.amount.checked_sub(amount).unwrap();
         Ok(())
     }
 }
@@ -139,12 +137,11 @@ impl<'info> Operations<'info> {
 
 #[account]
 pub struct VaultState{
-    pub amount: u64,
-    pub vault_bump: u8,
     pub state_bump: u8,
+    pub mint: Pubkey,
+    pub amount: u64,
 }
 
-impl Space for VaultState {
-    const INIT_SPACE: usize = 8 + 8 + 1 + 1;
-
+impl VaultState {
+    const INIT_SPACE: usize = 8 + 1 + 32 + 8; //discriminator +  statebump + mint pubkey + amount u64
 }
