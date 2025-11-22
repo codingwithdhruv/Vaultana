@@ -145,3 +145,16 @@ pub struct VaultState{
 impl VaultState {
     const INIT_SPACE: usize = 8 + 1 + 32 + 8; //discriminator +  statebump + mint pubkey + amount u64
 }
+
+#[error_code]
+pub enum CustomError {
+    #[msg("Insufficient funds")]
+    InsufficientFunds,
+
+    #[msg("Overflow error")]
+    Overflow,
+
+    #[msg("Underflow error")]
+    Underflow,
+
+}
