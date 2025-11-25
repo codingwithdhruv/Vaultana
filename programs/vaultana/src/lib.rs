@@ -59,6 +59,10 @@ impl<'info> Initialize<'info> {
         self.state.mint = self.mint.key();
         self.state.state_bump = bumps.state;
         self.state.amount = 0;
+
+        let decimals = self.mint.decimals;
+        self.state.decimals = decimals;
+
         Ok(())
     }
 }
@@ -81,6 +85,7 @@ pub struct Operations<'info> {
     pub vault: Account<'info, TokenAccount>,
 
     #[account(
+        mut,
         seeds = [b"state".as_ref(), user.key().as_ref(), state.mint.as_ref()],
         bump = state.state_bump,
     )]
@@ -91,6 +96,11 @@ pub struct Operations<'info> {
 impl<'info> Operations<'info> {
     pub fn deposit_token(&mut self, amount: u64) -> Result<()> {
 
+        let decimals = self.state.decimals;
+        let min = 5 * 10u64.pow(decimals as u32);
+
+        require!(amount >= min, CustomError::DepositTooSmall);
+
         let cpi_accounts = TokenTransfer {
             from: self.user_token_account.to_account_info(),
             to: self.vault.to_account_info(),
@@ -99,7 +109,8 @@ impl<'info> Operations<'info> {
 
         let cpi_ctx = CpiContext::new(self.token_program.to_account_info(), cpi_accounts);
         token::transfer(cpi_ctx, amount)?;
-        self.state.amount = self.state.amount.checked_add(amount).unwrap();
+
+        self.state.amount += amount;
 
         Ok(())
     }
@@ -140,21 +151,20 @@ pub struct VaultState{
     pub state_bump: u8,
     pub mint: Pubkey,
     pub amount: u64,
-}
+    pub decimals: u8,}
 
 impl VaultState {
-    const INIT_SPACE: usize = 8 + 1 + 32 + 8; //discriminator +  statebump + mint pubkey + amount u64
+    const INIT_SPACE: usize = 8 + 1 + 32 + 8 + 1 ; //discriminator +  statebump + mint pubkey + amount u64 + decimals
 }
 
 #[error_code]
 pub enum CustomError {
     #[msg("Insufficient funds")]
     InsufficientFunds,
-
+    #[msg("Deposit amount too small")]
+    DepositTooSmall,
     #[msg("Overflow error")]
     Overflow,
-
     #[msg("Underflow error")]
     Underflow,
-
 }

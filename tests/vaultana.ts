@@ -99,7 +99,7 @@ describe("vaultana - token vault tests", function () {
 
 
   it("rejects deposit < 5 token", async () => {
-    const small = Math.floor(5 * ONE);
+    const small = Math.floor(4 * ONE);
 
     try {
       await program.methods
@@ -118,7 +118,32 @@ describe("vaultana - token vault tests", function () {
     }
   });
 
-})
+
+
+  it("accepts deposit >= 5 token", async () => {
+    const amt = 5 * ONE;
+
+    await program.methods
+      .deposit(new anchor.BN(amt))
+      .accounts({
+        user: provider.publicKey,
+        userTokenAccount: userAta,
+        vault: vaultAta,
+        state: statePda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const vaultAcc = await getAccount(connection, vaultAta);
+    assert.equal(Number(vaultAcc.amount), amt, "vault should have received 5 token");
+
+    const stateAcct = await program.account.vaultState.fetch(statePda);
+    assert.equal(Number(stateAcct.amount), amt, "state.amount must reflect deposit");
+  });
+
+
+});
+
 
 
  
