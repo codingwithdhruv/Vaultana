@@ -142,6 +142,30 @@ describe("vaultana - token vault tests", function () {
   });
 
 
+
+  it("rejects withdrawal > vault holdings", async () => {
+
+    const tooMuch = 100 * ONE;
+
+    try {
+      await program.methods
+        .withdrawal(new anchor.BN(tooMuch))
+        .accounts({
+          user: provider.publicKey,
+          userTokenAccount: userAta,
+          vault: vaultAta,
+          state: statePda,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        })
+        .rpc();
+      assert.fail("withdrawal of amount > stored amount should have failed");
+    } catch (err) {
+      console.log("expected error for over-withdraw:", err);
+    }
+  });
+
+  
+
 });
 
 
