@@ -56,10 +56,10 @@ describe("vaultana - token vault tests", function () {
       mintPubkey, 
       userAta, 
       payer, 
-      10 * ONE);
+      20 * ONE);
       
     const userAcc = await getAccount(connection, userAta);
-    assert.equal(Number(userAcc.amount), 10 * ONE, "minting to user ATA failed");
+    assert.equal(Number(userAcc.amount), 20 * ONE, "minting to user ATA failed");
 
     [statePda, stateBump] = PublicKey.findProgramAddressSync(
       [Buffer.from("state"), provider.publicKey.toBuffer(), mintPubkey.toBuffer()],
@@ -164,7 +164,47 @@ describe("vaultana - token vault tests", function () {
     }
   });
 
-  
+
+  it("withdraws up to available amount", async () => {
+
+    const depositExtra = 6 * ONE;
+    await program.methods
+      .deposit(new anchor.BN(depositExtra))
+      .accounts({
+        user: provider.publicKey,
+        userTokenAccount: userAta,
+        vault: vaultAta,
+        state: statePda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const beforeVault = await getAccount(connection, vaultAta);
+    const beforeUser = await getAccount(connection, userAta);
+
+    const withdrawFloat = 2.5 * ONE;
+    const withdrawInt = Math.floor(withdrawFloat);
+
+    await program.methods
+      .withdrawal(new anchor.BN(withdrawInt))
+      .accounts({
+        user: provider.publicKey,
+        userTokenAccount: userAta,
+        vault: vaultAta,
+        state: statePda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc();
+
+    const afterVault = await getAccount(connection, vaultAta);
+    const afterUser = await getAccount(connection, userAta);
+
+    assert.ok(Number(afterVault.amount) < Number(beforeVault.amount), "vault decreased");
+    assert.ok(Number(afterUser.amount) > Number(beforeUser.amount), "user received tokens");
+
+    const stateAcct = await program.account.vaultState.fetch(statePda);
+    console.log("final state.amount:", stateAcct.amount.toString());
+  });
 
 });
 
