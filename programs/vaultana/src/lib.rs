@@ -2,7 +2,7 @@ use anchor_lang::{prelude::*};
 use anchor_spl::token::{self, Token, TokenAccount, Transfer as TokenTransfer, Mint};
 use anchor_spl::associated_token::AssociatedToken;
 
-declare_id!("8b1gGyfBb45nA8nsWDmsHLXMTtcb3yds4GGqhzojQXtv");
+declare_id!("AZWo7inNyu6C2azLZJ599ffTWSJYRkkx5aJSV2quh1tU");
 
 #[program]
 pub mod vaultana {
